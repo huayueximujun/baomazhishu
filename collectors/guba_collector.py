@@ -1,0 +1,132 @@
+import os
+import sys
+import time
+import hashlib
+from datetime import datetime
+from typing import Dict, List
+
+import akshare as ak
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from analyzer.index_calculator import SECTOR_NAMES
+
+SECTOR_ETF = {
+    
+    "semiconductor":    {"name": "半导体",     "code": "159995"},
+    "electronics":      {"name": "电子",       "code": "159997"},
+    "ai_computing":     {"name": "AI算力",     "code": "159819"},
+    "cpo":              {"name": "CPO光通信",  "code": "515880"},
+    "ai_application":   {"name": "AI应用",     "code": "159819"},   
+    "deepseek":         {"name": "DeepSeek概念","code": "588730"},  
+    
+    "computer":         {"name": "计算机",     "code": "512720"},
+    "communication":    {"name": "通信",       "code": "515050"},
+    "military":         {"name": "军工",       "code": "512660"},
+    "robot":            {"name": "机器人",     "code": "562500"},
+    "humanoid_robot":   {"name": "人形机器人", "code": "159770"},   
+    "ai_agent":         {"name": "AI智能体",   "code": "516510"},   
+    "low_altitude":     {"name": "低空经济",   "code": "159378"},   
+    "satellite_internet":{"name": "卫星互联网","code": "159206"},   
+    
+    "newenergy":        {"name": "新能源",     "code": "516160"},
+    "battery":          {"name": "电池",       "code": "159755"},
+    "power_grid":       {"name": "电力设备",   "code": "159611"},
+    "solid_battery":    {"name": "固态电池",   "code": "159755"},   
+    "nuclear_fusion":   {"name": "可控核聚变", "code": "561790"},   
+    
+    "medicine":         {"name": "医药",       "code": "512010"},
+    "baijiu":           {"name": "白酒",       "code": "512690"},
+    "food":             {"name": "食品饮料",   "code": "515080"},
+    "appliance":        {"name": "家电",       "code": "159996"},
+    "tourism":          {"name": "文旅",       "code": "159766"},
+    "media":            {"name": "传媒",       "code": "512980"},
+    "biotech":          {"name": "创新药",     "code": "159992"},
+    "consumer":         {"name": "大消费",     "code": "159928"},
+    
+    "bank":             {"name": "银行",       "code": "512800"},
+    "securities":       {"name": "券商",       "code": "512880"},
+    "insurance":        {"name": "保险",       "code": "512570"},
+    
+    "coal":             {"name": "煤炭",       "code": "515220"},
+    "crude_oil":        {"name": "石油石化",   "code": "501018"},
+    "nonferrous":       {"name": "有色金属",   "code": "512400"},
+    "chemical":         {"name": "化工",       "code": "516220"},
+    "steel":            {"name": "钢铁",       "code": "515210"},
+    
+    "infrastructure":   {"name": "基建",       "code": "516950"},
+    "realestate":       {"name": "房地产",     "code": "512200"},
+    
+    "gold":             {"name": "黄金",       "code": "518880"},
+    "nasdaq":           {"name": "纳斯达克",   "code": "513100"},
+}
+
+
+def _to_post(row: Dict, sector: str) -> Dict:
+    title = str(row.get("新闻标题", "")).strip()[:120]
+    content = str(row.get("新闻内容", "")).strip()[:300]
+    url = str(row.get("新闻链接", "")).strip()
+    source = str(row.get("文章来源", "东方财富")).strip()
+    pub_time = str(row.get("发布时间", "")).strip()
+
+    if not title:
+        return None
+
+    post_id = hashlib.md5((url or title).encode("utf-8")).hexdigest()[:12]
+
+    return {
+        "id": f"guba_{sector}_{post_id}",
+        "title": title,
+        "content": content,
+        "url": url,
+        "platform": "guba",
+        "author": source or "东方财富财经",
+        "date": pub_time,
+        "collected_at": datetime.now().isoformat(),
+    }
+
+
+def collect_all() -> Dict[str, List[Dict]]:
+    result: Dict[str, List[Dict]] = {}
+    total = 0
+    MAX_RETRIES = 2
+    RETRY_BACKOFF = 1.0
+
+    for sector_key, cfg in SECTOR_ETF.items():
+        code = cfg["code"]
+        name = cfg["name"]
+        posts: List[Dict] = []
+
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                df = ak.stock_news_em(symbol=code)
+                if df is not None and not df.empty:
+                    for _, row in df.iterrows():
+                        post = _to_post(row.to_dict(), sector_key)
+                        if post:
+                            posts.append(post)
+                print(f"  [{name}] AKShare采集到 {len(posts)} 条新闻")
+                break
+            except Exception as e:
+                if attempt < MAX_RETRIES:
+                    time.sleep(RETRY_BACKOFF * (attempt + 1))
+                else:
+                    print(f"  [{name}] AKShare采集失败（已重试{MAX_RETRIES}次）: {e}")
+
+        result[sector_key] = posts
+        total += len(posts)
+        time.sleep(0.3)
+
+    print(f"  [股吧/AKShare] 采集完成，共 {total} 条真实新闻数据")
+    return result
+
+
+if __name__ == "__main__":
+    data = collect_all()
+    for k, v in data.items():
+        print(f"{k}: {len(v)} posts")
+        if v:
+            for p in v[:2]:
+                print(f"  - {p['title'][:60]}")

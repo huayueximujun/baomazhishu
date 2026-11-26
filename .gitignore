@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 环境
+.env
+.venv/
+venv/
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志
+*.log
+logs/
+
+# Chrome profiles (Playwright)
+*.pw_profile/
+
+# 项目临时归档
+_archive*/
+_archive_*/
+
+# 临时验证脚本
+verify_*.py
+execute_rectification.py
+_check_db.py
+_fix_db.py
+
+# 数据报告文件
+data/*_report.json
+data/*_doc.json
+data/*_manual.json
+data/*_audit_log.json
+
+# 数据备份目录
+data/backup_*/
+
+# 前端依赖与构建产物
+node_modules/
+dist/
+build/
+release/
+
+# SQLite 数据库文件
+backend/dashboard.db
+
+# 审查回执日志（本地记录，不入库）
+.review_receipts.log
+
+# 测试覆盖率产物
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
+# PyInstaller 构建产物与 UPX 二进制
+build_pyinstaller*.log
+upx/
